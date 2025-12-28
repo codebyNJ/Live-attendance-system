@@ -1,63 +1,49 @@
-import type {Request, Response, NextFunction}  from "express";
 import jwt from 'jsonwebtoken';
+import type { Request, Response, NextFunction } from 'express';
 
-
-interface AuthenticatedRequest extends Request {
-    user?: {
-        email: string;
-        role: 'student' | 'teacher';
-    };
-}
-
-export const authenticate = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+export const authenticate = (req: Request, res: Response, next: NextFunction) => {
     const authHeader = req.headers.authorization;
+    
     if (!authHeader) {
         return res.status(401).json({
-            "success": false,
-            "message": "Authorization header missing"
+            success: false,
+            error: "Unauthorized, token missing or invalid"
         });
     }
 
-    const token = authHeader.split(' ')[1];
-    console.log("Token:", token);
-    if(!token){
-        return res.status(401).json({
-            "status" : false,
-            "message" : "unauthorized user"
-        })
+    let token = authHeader;
+    if (authHeader.startsWith('Bearer ')) {
+        token = authHeader.slice(7);
     }
-
-    try{
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'nijeesh') as { email: string; role: 'student' | 'teacher' };
-        req.user = {
-            email: decoded.email,
-            role: decoded.role
-        };
+    
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'nijeesh');
+        (req as any).user = decoded;
         next();
-    }catch{
+    } catch (error) {
         return res.status(401).json({
-            "status" : false,
-            "message" : "invalid token"
-        })
+            success: false,
+            error: "Unauthorized, token missing or invalid"
+        });
     }
-}
+};
 
-export const teacherOnly = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-    if(req.user?.role !== 'teacher'){
+export const teacherOnly = (req: Request, res: Response, next: NextFunction) => {
+    if ((req as any).user?.role !== 'teacher') {
         return res.status(403).json({
-            "status" : false,
-            "message" : "forbidden access"
-        })
+            success: false,
+            error: "Forbidden, teacher access required"
+        });
     }
     next();
-}
+};
 
-export const studentOnly = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-    if(req.user?.role !== 'student'){
+export const studentOnly = (req: Request, res: Response, next: NextFunction) => {
+    if ((req as any).user?.role !== 'student') {
         return res.status(403).json({
-            "status" : false,
-            "message" : "forbidden access"
-        })
+            success: false,
+            error: "Forbidden, student access required"
+        });
     }
     next();
-}
+};
